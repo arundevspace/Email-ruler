@@ -1,0 +1,57 @@
+[
+  {
+    "description": "HappyFox Interview Mail Filter (Assignment Example)",
+    "predicate": "All",
+    "conditions": [
+      {
+        "field": "From",
+        "operator": "contains",
+        "value": "happyfox.hire.trakstar.com"
+      },
+      {
+        "field": "Subject",
+        "operator": "contains",
+        "value": "Interview"
+      },
+      {
+        "field": "Received Date/Time",
+        "operator": "less than (days)",
+        "value": "2"
+      }
+    ],
+    "actions": [
+      {
+        "type": "Move Message",
+        "value": "Processed" 
+      },
+      {
+        "type": "Mark as Read"
+      }
+    ]
+  },
+  {
+    "description": "Spam/Promo Cleanup Example",
+    "predicate": "Any",
+    "conditions": [
+      {
+        "field": "From",
+        "operator": "equals",
+        "value": "spam@example.com"
+      },
+      {
+        "field": "Message",
+        "operator": "contains",
+        "value": "promo code"
+      }
+    ],
+    "actions": [
+      {
+        "type": "Mark as Unread"
+      },
+      {
+        "type": "Move Message",
+        "value": "Trash"
+      }
+    ]
+  }
+]
