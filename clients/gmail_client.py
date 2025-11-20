@@ -51,8 +51,12 @@ class GmailClient:
 
         return build('gmail', 'v1', credentials=creds)
 
-    def fetch_emails(self, max_results=100) -> List[Email]:
-        """Fetches the latest emails from the Inbox."""
+    def fetch_emails(self, max_results=100, existing_ids: set = None) -> List[Email]:
+        """Fetches the latest emails from the Inbox.
+
+        If `existing_ids` is provided, message IDs present in that set will be
+        skipped to avoid unnecessary API calls and re-fetching already-stored messages.
+        """
         emails_list = []
         try:
             # 1. Get a list of message IDs from the INBOX
@@ -66,12 +70,17 @@ class GmailClient:
             
             # 2. Fetch the full content for each message
             for message in messages:
+                mid = message['id']
+                if existing_ids and mid in existing_ids:
+                    # Skip fetching message body for already stored messages
+                    continue
+
                 msg = self.service.users().messages().get(
-                    userId=self.user_id, 
-                    id=message['id'], 
+                    userId=self.user_id,
+                    id=mid,
                     format='full'
                 ).execute()
-                
+
                 email = self._parse_message(msg)
                 if email:
                     emails_list.append(email)

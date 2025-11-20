@@ -7,7 +7,7 @@ class Action:
     type: str   # e.g., "Mark as Read", "Move Message"
     value: str = None # e.g., "UNREAD" or "Processed" (mailbox name)
 
-# Represents a single condition (e.g., From, contains, tenmiles.com)
+# Represents a single condition (e.g., From, contains)
 @dataclass(frozen=True)
 class Condition:
     field: str      # e.g., "From", "Subject", "Received Date/Time"

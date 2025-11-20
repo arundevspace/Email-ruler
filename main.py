@@ -30,7 +30,7 @@ def run_mail_processor():
 
     # 3. Load all Emails from the DB for processing
     print("Step 3: Loading all emails from the database for rule execution...")
-    all_emails = db_manager.get_all_emails()
+    all_emails = db_manager.get_unprocessed_emails()
     
     # 4. Initialize and Run Rule Processor
     # Pass the client and db manager to the processor so it can execute actions

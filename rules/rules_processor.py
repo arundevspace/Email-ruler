@@ -136,6 +136,16 @@ class RuleProcessor:
 
             if not is_rule_matched:
                 pass # Email did not match any rule
+            else:
+                # This `else` executes if the loop wasn't broken (no match); keep for clarity
+                pass
+
+            # After attempting rules, mark the email as processed so it won't be reprocessed
+            try:
+                if self.db:
+                    self.db.mark_processed(email.id)
+            except Exception as e:
+                print(f"Failed to mark email {email.id[:8]} as processed: {e}")
 
     def _execute_actions(self, email: Email, actions: List[Action]):
         """Executes the list of actions via the GmailClient and updates the DB."""

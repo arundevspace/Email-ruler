@@ -19,7 +19,9 @@ def ingest_latest_emails(max_emails=100):
 
     # 2. Fetch Emails
     print(f"Fetching up to {max_emails} emails from Gmail...")
-    emails = gmail_client.fetch_emails(max_emails)
+    # Avoid refetching messages already stored in the DB to save quota
+    existing_ids = set(db_manager.get_all_ids())
+    emails = gmail_client.fetch_emails(max_emails, existing_ids=existing_ids)
     
     if not emails:
         print("No emails fetched. Check API connection/permissions.")
