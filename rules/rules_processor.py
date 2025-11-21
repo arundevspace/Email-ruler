@@ -10,7 +10,7 @@ from models.email import Email
 from clients.gmail_client import GmailClient  # Needed for action execution
 
 class RuleProcessor:
-    def __init__(self, rules_file='rules/rules.json', db_manager=None, gmail_client=None):
+    def __init__(self, rules_file='rules/rules.json', db_manager=None, gmail_client=None, dry_run: bool = False, verbose: bool = False):
         # Load rules only if a rules_file path is provided; allow tests to inject rules directly
         if rules_file:
             self.rules: List[Rule] = self._load_rules(rules_file)
@@ -18,6 +18,8 @@ class RuleProcessor:
             self.rules: List[Rule] = []
         self.db = db_manager # For potential DB updates
         self.client = gmail_client # For API actions
+        self.dry_run = dry_run
+        self.verbose = verbose
 
     def _load_rules(self, file_path) -> List[Rule]:
         """Loads and parses the JSON rules file into Rule objects."""
@@ -103,8 +105,8 @@ class RuleProcessor:
 
     def process_emails(self, emails: List[Email]):
         """Main loop to apply all loaded rules to a list of emails."""
-        if not self.client:
-            raise ValueError("Gmail Client must be set on RuleProcessor to perform actions.")
+        if not self.client and not self.dry_run:
+            raise ValueError("Gmail Client must be set on RuleProcessor to perform actions unless running in dry-run mode.")
             
         print(f"\n--- Starting Rule Processing on {len(emails)} emails ---")
 
@@ -115,9 +117,16 @@ class RuleProcessor:
             #     continue 
 
             is_rule_matched = False
+            if self.verbose:
+                print(f"\nEvaluating email {email.id[:8]}: From='{email.from_address}' Subject='{email.subject}' Received='{email.received_at}'")
+
             for rule in self.rules:
-                match_results = [self._check_condition(email, condition) 
-                                 for condition in rule.conditions]
+                match_results = []
+                for condition in rule.conditions:
+                    result = self._check_condition(email, condition)
+                    match_results.append(result)
+                    if self.verbose:
+                        print(f"  Condition: field='{condition.field}' op='{condition.operator}' value='{condition.value}' -> {result}")
                 
                 # Apply the overall predicate: "All" or "Any" [cite: 46, 47, 48]
                 is_satisfied = False
@@ -126,8 +135,12 @@ class RuleProcessor:
                 elif rule.predicate.lower() == 'any':
                     is_satisfied = any(match_results)
 
+                if self.verbose:
+                    print(f"  Predicate '{rule.predicate}' => {is_satisfied}")
+
                 if is_satisfied:
                     print(f"Rule MATCHED: '{rule.description}' for email ID: {email.id[:8]}...")
+                    # Always call _execute_actions; it will respect dry_run and verbose
                     self._execute_actions(email, rule.actions)
                     is_rule_matched = True
                     # Optionally, break after the first match to prevent multiple rules from running
@@ -142,7 +155,8 @@ class RuleProcessor:
 
             # After attempting rules, mark the email as processed so it won't be reprocessed
             try:
-                if self.db:
+                # In dry-run mode we do not modify the DB
+                if self.db and not self.dry_run:
                     self.db.mark_processed(email.id)
             except Exception as e:
                 print(f"Failed to mark email {email.id[:8]} as processed: {e}")
@@ -152,6 +166,20 @@ class RuleProcessor:
         for action in actions:
             action_type = action.type.lower()
 
+            if self.dry_run:
+                # Print what would be done, but do not call Gmail or modify DB
+                if action_type == 'mark as read':
+                    print(f"[DRY-RUN] Would mark email {email.id[:8]} as read")
+                elif action_type == 'mark as unread':
+                    print(f"[DRY-RUN] Would mark email {email.id[:8]} as unread")
+                elif action_type == 'move message':
+                    mailbox = action.value
+                    print(f"[DRY-RUN] Would move email {email.id[:8]} to label '{mailbox}'")
+                else:
+                    print(f"[DRY-RUN] Unknown action '{action.type}' for email {email.id[:8]}")
+                continue
+
+            # Real execution path (non-dry-run)
             if action_type == 'mark as read':
                 if self.client.mark_as_read_unread(email.id, mark_as_read=True):
                     if self.db:
@@ -162,6 +190,13 @@ class RuleProcessor:
                         self.db.update_email_status(email.id, is_read=False)
             elif action_type == 'move message':
                 mailbox = action.value  # The target label/mailbox name
-                if self.client.move_message(email.id, mailbox):
-                    # Note: DB status update for move is optional; print for visibility
-                    print(f"Action: Moved email {email.id[:8]}... to '{mailbox}'")
+                print(f"Attempting to move email {email.id[:8]}... to '{mailbox}'")
+                try:
+                    result = self.client.move_message(email.id, mailbox)
+                    print(f"move_message returned: {result}")
+                    if result:
+                        print(f"Action: Moved email {email.id[:8]}... to '{mailbox}'")
+                    else:
+                        print(f"Action: move_message reported failure for {email.id[:8]} -> '{mailbox}'")
+                except Exception as e:
+                    print(f"Exception while moving message {email.id[:8]}: {e}")

@@ -1,22 +1,22 @@
 [
   {
-    "description": "HappyFox Interview Mail Filter (Assignment Example)",
-    "predicate": "All",
+    "description": "Linked Job Alerts Processing",
+    "predicate": "Any",
     "conditions": [
       {
         "field": "From",
         "operator": "contains",
-        "value": "happyfox.hire.trakstar.com"
+        "value": "jobalerts-noreply@linkedin.com"
       },
       {
         "field": "Subject",
         "operator": "contains",
-        "value": "Interview"
+        "value": "Job"
       },
       {
         "field": "Received Date/Time",
         "operator": "less than (days)",
-        "value": "2"
+        "value": "7"
       }
     ],
     "actions": [
@@ -31,17 +31,17 @@
   },
   {
     "description": "Spam/Promo Cleanup Example",
-    "predicate": "Any",
+    "predicate": "All",
     "conditions": [
       {
         "field": "From",
         "operator": "equals",
-        "value": "spam@example.com"
+        "value": "jobs-noreply@linkedin.com"
       },
       {
         "field": "Message",
         "operator": "contains",
-        "value": "promo code"
+        "value": "Jobs"
       }
     ],
     "actions": [
@@ -55,3 +55,5 @@
     ]
   }
 ]
+
+

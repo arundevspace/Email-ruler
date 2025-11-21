@@ -185,18 +185,18 @@ class GmailClient:
         # Note: In Gmail, moving a message is done by adding a new label and 
         # removing the old system labels (like INBOX).
         try:
-            # First, you might need to find the ID of the new label
-            # This is complex, so for simplicity, we assume the label exists 
-            # and use its name or a known ID. A full implementation would require 
-            # a helper function to resolve the label name to its ID.
-            
-            # For this step, we'll assume the new_label_name is a system label 
-            # or a user-created label ID for brevity.
-            # Real-world: Need a function to get the actual label ID.
-            
+            # Resolve the label name to a Gmail label ID. System labels
+            # (INBOX, TRASH, SPAM, SENT, DRAFT) are used as-is. For user
+            # labels, fetch/create the label and use its ID.
+            system_labels = {'INBOX', 'TRASH', 'SPAM', 'SENT', 'DRAFT'}
+            if new_label_name in system_labels:
+                label_id = new_label_name
+            else:
+                label_id = self._get_or_create_label_id(new_label_name)
+
             body = {
-                'addLabelIds': [new_label_name], # Assuming new_label_name is the ID/Name
-                'removeLabelIds': ['INBOX'] # Remove from Inbox to 'move' it
+                'addLabelIds': [label_id],
+                'removeLabelIds': ['INBOX']
             }
             
             self.service.users().messages().modify(
@@ -209,3 +209,31 @@ class GmailClient:
         except Exception as e:
             print(f"Error moving message {email_id}: {e}")
             return False
+
+    def _get_or_create_label_id(self, label_name: str) -> str:
+        """Return the Gmail label ID for `label_name`, creating the label if missing."""
+        try:
+            resp = self.service.users().labels().list(userId=self.user_id).execute()
+            labels = resp.get('labels', [])
+            # Try exact match first, then case-insensitive match
+            for lbl in labels:
+                if lbl.get('name') == label_name:
+                    print(f"Found existing label (exact): {label_name} -> {lbl.get('id')}")
+                    return lbl.get('id')
+            for lbl in labels:
+                if lbl.get('name', '').lower() == label_name.lower():
+                    print(f"Found existing label (case-insensitive): {label_name} -> {lbl.get('id')}")
+                    return lbl.get('id')
+
+            # Label not found: create it
+            body = {
+                'name': label_name,
+                'labelListVisibility': 'labelShow',
+                'messageListVisibility': 'show'
+            }
+            created = self.service.users().labels().create(userId=self.user_id, body=body).execute()
+            print(f"Created label '{label_name}' -> {created.get('id')}")
+            return created.get('id')
+        except Exception as e:
+            print(f"Error resolving/creating label '{label_name}': {e}")
+            return label_name
